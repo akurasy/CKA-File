@@ -1,0 +1,48 @@
+MONITOR CLUSTER COMPONENT
+
+used to monitor pod level metric, cpu and memory consumption and other parameters
+
+you can have a metric server on a cluster
+
+a metric cluster receives metrics from kubernetes nodes and pods, aggregate them and store then in nmemory.
+
+if you are using minikube, run the command 
+
+
+minkube addons enable metrics-server
+for other environment, deploy the the netric server by cloning the metric server deployment file from the github repository
+
+git clone https://github.com/kubernetes-incubator/metrics-server, the deploying the required component using the kubectl command
+
+kubectl create -f deploy/1.8+/
+this command above deploys a set of pods and rules to make the metric server to pull for poerformance metrics from the node in the cluster
+
+once deployed, give the metric server some time to process data.
+
+
+to view cluster process, run the command 
+
+
+kubectl top node 
+
+this provides the cpu and memory consumption of the node
+
+use;
+ 
+kubectl top pod
+ 
+to view performance mertrics of pod in kubernetes.
+
+
+
+===============================================================
+
+
+MANAGING APPLICATIONS LOGS
+
+kubectl create -f logs.yaml
+kubectl logs -f logs.yaml    = logs.yaml can be a pod deployment
+
+if you have multiple containers running, you must specify the name of the container otherwise it will return an error message asking you to specify container name
+
+kubectl logs -f logs.yaml container-name 

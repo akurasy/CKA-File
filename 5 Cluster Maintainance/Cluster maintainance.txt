@@ -1,0 +1,195 @@
+
+OS UPGRADES
+
+The time it waits for a pod to come back to life is called pod eviction timeout and it is set on the kubernetes cluster.
+
+if you have a pod running on a node and you want to perform an upgrade on that node, what you need to do is drain the node.
+
+
+kubectl drain node1
+
+the above command will move the pod to another node and keep it save . 
+the cordon command will put a restriction on the node and no pod will be scheduled on it.
+i.e, it make a pod unschedulable on the node.
+
+after your upgrade, you can remove restriction by uncordoning it
+
+kubectl uncordon node1
+
+
+============================================================
+
+KUBERNETES SOFTWARE VERSIONS
+
+References
+https://kubernetes.io/docs/concepts/overview/kubernetes-api/
+
+Here is a link to kubernetes documentation if you want to learn more about this topic (You don't need it for the exam though):
+
+https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md
+
+https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api_changes.md
+
+=================================================================
+
+CLUSTER UPGRADE PROCESS
+
+when upgrading your cluster from a lower version say 1.10 to a higer version 1.13, you cannot directly upgrade this.
+first you upgrade to versiobn 1.11, then to version 1.12 and finally to version 1.13.
+
+in a settings involving a master and several nodes, upgrading the master does not impact the application.
+
+but upgrading all nodes will impact the application. so you upgrade the nodes one after the other.
+
+apt-get upgrade kubelet-version === to upgrade ypur master node
+
+sudo systemctl restart kubelet
+
+to upgrade worker node, you need to first move the workload from one node to another by draining the node you want to upgrade
+
+kubectl drain node1  ==== this also cordon the node and mark it as unschedulable.
+
+for kubeadm upgrade and kubelet upgrade, pls visit kubernetes documentation for steps. 
+https://v1-27.docs.kubernetes.io/docs/tasks/administer-cluster/kubeadm/kubeadm-upgrade/
+
+================================================================================
+
+
+BACKUP AND RESTORE
+
+There are two ways of running a pod, the imperative and declarative way. the declarative file can be stored in a version repository such as github.
+and the deploy can be applied by oulling the file back into the kubernetes server.
+what if the deploymenst were done in an imperative format, the solution is to querry the kube-apiserver and check all the configurations files there.
+one of the way is to output the files into a yaml format using the below command;
+
+kubectl get all --all-namespaces -o yaml > all-deployed-service.yaml
+
+the above will output all configuratiojns to the yaml file. this is for a small resource code.
+
+for a large resource code. there are tools you can use called ARK. this will help to backup ypur resource code.
+
+ANOTHER WAY IS TO TAKE A SNAPSHOT OF THE ETCD CLUSTER.
+
+etcdctl snapshot save snapshot.db    ===== snapshot.db is the name of the snapshot
+for the above since you are interacting etcd server you need to add the key, certificate, ca-cert and endpoints toi the above command
+
+etcdctl snapshot save --endpoints=<value>\ \
+--cacert=<value> \
+--cert=<value> \
+--key=<value> \
+snapshopt.db
+
+
+etcdctl snapshot save --endpoints=127.0.0.1:2379 \ 
+--cacert=/etc/kubernetes/pki/etcd/ca.crt \
+--cert=/etc/kubernetes/pki/etcd/server.crt \
+--key=/etc/kubernetes/pki/etcd/server.key \
+snapshopt.db
+
+
+you can vioew the status of the backup using the backup status command  
+
+snapshot status snapshot.db
+
+TO RESTORE THE CLUSTER FROM THIS SNAPSHOT AT A LATER TIME,
+
+first stop the kube-apiserver by running the command
+
+service kube-apiserver stop
+
+now run the command
+
+etcd snapshot restore snapshot.db --data-dir /var/lib/etcd-from-backup    (specify the path)
+
+systemctl deamon-reload
+systemctl restart etcd
+
+start the kube-apiserver service
+
+service kube-apiserver start
+
+========================================================================
+
+Working with ETCDCTL
+
+to check etcd pod, run the command
+
+kubectl get pod -n kube-system      == this will also show etcd pod in the kube-system namespace
+
+
+etcdctl is a command line client for etcd.
+
+
+
+In all our Kubernetes Hands-on labs, the ETCD key-value database is deployed as a static pod on the master. The version used is v3.
+
+To make use of etcdctl for tasks such as back up and restore, make sure that you set the ETCDCTL_API to 3.
+
+
+
+You can do this by exporting the variable ETCDCTL_API prior to using the etcdctl client. This can be done as follows:
+
+export ETCDCTL_API=3
+
+On the Master Node:
+
+
+
+
+
+To see all the options for a specific sub-command, make use of the -h or --help flag.
+
+
+
+For example, if you want to take a snapshot of etcd, use:
+
+etcdctl snapshot save -h and keep a note of the mandatory global options.
+
+
+
+Since our ETCD database is TLS-Enabled, the following options are mandatory:
+
+--cacert                                                verify certificates of TLS-enabled secure servers using this CA bundle
+
+--cert                                                    identify secure client using this TLS certificate file
+
+--endpoints=[127.0.0.1:2379]          This is the default as ETCD is running on master node and exposed on localhost 2379.
+
+--key                                                      identify secure client using this TLS key file
+
+
+
+
+
+Similarly use the help option for snapshot restore to see all available options for restoring the backup.
+
+etcdctl snapshot restore -h
+
+For a detailed explanation on how to make use of the etcdctl command line tool and work with the -h flags, check out the solution video for the Backup and Restore Lab.
+
+
+============================================================
+
+
+CERTIFICATION EXAM TIP!
+
+Here's a quick tip. In the exam, you won't know if what you did is correct or not as in the practice tests in this course. You must verify your work yourself.
+For example, if the question is to create a pod with a specific image, you must run the the kubectl describe pod command 
+to verify the pod is created with the correct name and correct image.
+
+References
+https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/#backing-up-an-etcd-cluster
+
+https://github.com/etcd-io/website/blob/main/content/en/docs/v3.5/op-guide/recovery.md
+
+https://www.youtube.com/watch?v=qRPNuT080Hk
+
+
+
+
+
+
+
+
+
+

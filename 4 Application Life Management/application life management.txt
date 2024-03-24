@@ -1,0 +1,418 @@
+ROLLOUT AND VERSIONING
+
+rollout helps us to roll back to the pervious deployment when necessary
+
+kubectl rollout status deployment/myapp-deployment = to see the rollout status
+
+myapp-deployment is the name of the deployment
+
+to update the image of your ap, use the command kubectl set image deployment/myapp-deployment nginx=nginx:1.9.1
+nginx = container name
+nginx:1.9.1 = image name
+
+it will update the image inside your container
+
+when you notice an issue with your new upgrade, kubernetes allows you to roll back to the previous version of your deployment.
+to undo the upgrade, run the command 
+
+
+kubectl rollout undo deplyment/myapp-deployment
+
+
+the deployment will then destroy the pod in the new replicaset and bring back the old repllicaset and application is back to the old format.
+
+summarize commands
+create = kubectl create -f deployment.yaml   #to create deployment
+get = kubectl get deployment  #to see your deployments
+update = kubectl apply -f deployment.yaml and kubectl set image deployment/myapp-deployment nginx=nginx:1.9.1 #to update the deployment
+status = kubectl rollout status deplyment/myapp-deployment and kubectl rollout history deplyment/myapp-deployment #to see the status of the rollout
+rollback = kubectl rollout undo deplyment/myapp-deployment #to undo an upgrade and roll back to the initial version.
+
+PLS NOTE: Recreate strategy does not require the rolling update parameter.
+for recreate
+
+strategy:
+  type : Recreate
+
+
+fior rollingupdate
+
+
+strategy
+  rollingUpdate:
+    maxSurge: 25%
+    maxUnavailable: 25%
+  type: RollingUpdate
+
+ 
+
+=================================================================================
+
+APPLICATION COMMANDS AND ARGUMENTS
+
+pod-definition.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ubuntu-sleep
+  label:
+    name: ubuntu-sleep
+spec:
+  containers:
+  - name: ubuntu-sleep
+    image: ubuntu-sleep
+    args: ["10"]
+
+CMD overides the entrypoint command
+
+FROM ubuntu
+
+CMD ["sleep", "5"]
+
+or
+
+FROM UBUNTU
+
+ENTYPOINT ["sleep"]   = this requires addition argument when running the container
+
+docker run ubuntu-sleep ubuntu-sleep 5     = it will pick the entry point "sleep" and run the sleep command
+
+
+
+========================================================================================================
+
+
+
+CONFIGURE ENVIRONMENTAL VARIABLE IN APPLICATIONS
+to set an environmental variable, use the parameter env
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: webapp-color
+spec:
+  containers:
+  - name: webapp-color
+    image: webapp-color
+    ports:
+    - containerPort: 8080
+  env:
+  - name: app-colour
+    value: pink
+
+there are other ways to specify the value of your env, such as using configmap and secrets
+
+
+=========================================================================
+
+CONFIG MAP
+Configmap are used to pass configuration in the form of key-value pair in kubernetes.
+
+there are two steps involvex: 
+1. create the configmap 2. inject them into the pod.
+
+to create using the imperative command, use the kubectl command specify the necessary arguments:
+
+kubectl create configmap <configmap-name> --from-literal=<key>=<value>
+
+kubectl create configmap my-configmap --from-literal=colour=pink
+
+# --from-literal is used to set the key-value pair. 
+
+HOWEVER, if you wish to specify another key-value, simply use another --from-literal command
+
+kubectl create configmap my-configmap --from-literla=colour=pink --from-literal=branch=prod
+
+THIS WILL BECOMNE TOO COMPLICATED IF YOU HAVE TOO MANY CONFIGMAP.
+
+another way to do tghis is to use the --from-file command. 
+
+kubectl create configmap <configmap-name> --from-file=<path-to-file>
+
+kubectl create configmap my-configmap --from-file=my-app.properties
+
+NOW LETS CREATE IN DECLARATIVE WAY. (we replaced spec with data)
+
+apiVersion: v1
+kind: configMap
+metadata:
+  name: app-config
+data:
+  app-colour: pink
+  branch: prod
+
+save the above in a file called my-config.yaml
+
+run the command:
+kubectl create -f my-config.yaml
+
+now lets run it with a pod
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: webapp-color
+spec:
+  containers:
+  - name: webapp-color
+    image: webapp-color
+    ports:
+    - containerPort: 8080
+    envFrom:
+    - configMapRef:
+        name: app-config    #this was picked from te name of the configmap created above.
+
+kubectl create -f pod-definition-file.yaml
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: webapp-color
+  name: webapp-color
+spec:
+  containers:
+  - env:
+    - name: APP_COLOR
+      value: green
+    image: kodekloud/webapp-color
+    name: webapp-color
+
+==================================================
+
+KUBERNETES SECRETS
+
+config map stores configuration data in plain text format, while secrets stores sensitive data in an encoding format.
+
+create the secret and inject into the pod. it can be created using the imperative and declarative way.
+
+kubectl create secret generic <secret-name> --from-literal=<key>=<value>
+
+declaratibve: (app-secret.yaml)
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+data:
+  DB-HOST: mysql
+  DB-USER: root
+  DB_PASWD: passwd
+
+the above is not safe because we are passing sensitive details in plain text
+we now get the encodeing value of this secrets using the linux encoding command
+
+echo -n mysql | base64
+echo -n root | base64
+echo n passwd| base64
+
+this will encode the secret values. so you replace the plaintext with the encoding output. this looks like this:
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secret
+data:
+  DB-HOST: cdgwxstted=
+  DB-USER: ietfxerdgtg=
+  DB_PASWD: gdtwcsxerst
+
+to decode the secret, use; echo -n cdgwxstted= | base64 decode
+
+
+injecting into pod definition file. pod-secret.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: webapp-color
+spec:
+  containers:
+  - name: webapp-color
+    image: webapp-color
+    ports:
+    - containerPort: 8080
+    envFrom:
+    - secretRef:
+        name: app-secret
+
+A note about Secrets!
+Remember that secrets encode data in base64 format. Anyone with the base64 encoded secret can easily decode it. As such the secrets can be considered as not very safe.
+
+
+The concept of safety of the Secrets is a bit confusing in Kubernetes. The kubernetes documentation page and a lot of blogs out there refer to secrets 
+as a "safer option" to store sensitive data. They are safer than storing in plain text as they reduce the risk of accidentally exposing passwords
+and other sensitive data. In my opinion it's not the secret itself that is safe, it is the practices around it. 
+
+Secrets are not encrypted, so it is not safer in that sense. However, some best practices around using secrets make it safer. As in best practices like:
+
+Not checking-in secret object definition files to source code repositories.
+
+Enabling Encryption at Rest for Secrets so they are stored encrypted in ETCD. 
+
+
+
+Also the way kubernetes handles secrets. Such as:
+
+A secret is only sent to a node if a pod on that node requires it.
+
+Kubelet stores the secret into a tmpfs so that the secret is not written to disk storage.
+
+Once the Pod that depends on the secret is deleted, kubelet will delete its local copy of the secret data as well.
+
+Read about the protections and risks of using secrets here
+
+
+
+Having said that, there are other better ways of handling sensitive data like passwords in Kubernetes, such as using tools like Helm Secrets,
+AWS secret manager, HashiCorp Vault. I hope to make a lecture on these in the future.
+
+
+====================================================================
+
+ENCRYPTING SECRET DATA AT REST ===== PRACTISE THIS
+
+
+
+
+
+===========================================================================
+
+MULTI CONTAINER PODS
+
+MULTI CONTAINER pods share the same lifecycle. that means they are created together and destroyed together.
+
+they share the same network space which means they can refer to each other as local host having access to the same storage volumes.
+
+under the spec ==== containers, you can add another container to the pod as many as possible container can be added to the pod.
+
+
+example below
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: webapp-color
+spec:
+  containers:
+  - name: container-1
+    image: container-1-image
+    ports:
+    - containerPort: 8080
+
+  - name: container-2
+    image: container-2-image
+
+
+==================================================
+
+INIT CONTAINERS
+
+InitContainers
+In a multi-container pod, each container is expected to run a process that stays alive as long as the POD's lifecycle. For example in the multi-container pod that we talked about earlier that has a web application and logging agent, both the containers are expected to stay alive at all times. The process running in the log agent container is expected to stay alive as long as the web application is running. If any of them fails, the POD restarts.
+
+
+
+But at times you may want to run a process that runs to completion in a container. For example a process that pulls a code or binary from a repository that will be used by the main web application. That is a task that will be run only  one time when the pod is first created. Or a process that waits  for an external service or database to be up before the actual application starts. That's where initContainers comes in.
+
+
+
+An initContainer is configured in a pod like all other containers, except that it is specified inside a initContainers section,  like this:
+
+
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox
+    command: ['sh', '-c', 'git clone <some-repository-that-will-be-used-by-application> ; done;']
+
+
+When a POD is first created the initContainer is run, and the process in the initContainer must run to a completion before the real container hosting the application starts. 
+
+You can configure multiple such initContainers as well, like how we did for multi-containers pod. In that case each init container is run one at a time in sequential order.
+
+If any of the initContainers fail to complete, Kubernetes restarts the Pod repeatedly until the Init Container succeeds.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp
+spec:
+  containers:
+  - name: myapp-container
+    image: busybox:1.28
+    command: ['sh', '-c', 'echo The app is running! && sleep 3600']
+  initContainers:
+  - name: init-myservice
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup myservice; do echo waiting for myservice; sleep 2; done;']
+  - name: init-mydb
+    image: busybox:1.28
+    command: ['sh', '-c', 'until nslookup mydb; do echo waiting for mydb; sleep 2; done;']
+
+
+Read more about initContainers here. And try out the upcoming practice test.
+
+https://kubernetes.io/docs/concepts/workloads/pods/init-containers/
+
+
+==============================================
+
+Self Healing Applications
+
+Kubernetes supports self-healing applications through ReplicaSets and Replication Controllers.
+ The replication controller helps in ensuring that a POD is re-created automatically when the application within the POD crashes.
+ It helps in ensuring enough replicas of the application are running at all times.
+
+Kubernetes provides additional support to check the health of applications running within PODs and take necessary actions through Liveness and Readiness Probes.
+However these are not required for the CKA exam and as such they are not covered here.
+These are topics for the Certified Kubernetes Application Developers (CKAD) exam and are covered in the CKAD course
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
