@@ -666,9 +666,126 @@ PRE-REQUISITE - SECURITY IN DOCKER
 
 
 
+============================================
+
+NETWORK POLICIES
+
+the network policy is configured to prevent traffic from the web server to the database. the database should only
+
+apiVersion: networking.k8s.io/vi
+kind: NetworkPolicy
+metadata
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role:db
+  policyTypes:
+  - ingress: 
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: api-pod
+    ports:
+    - protocol: tcp
+      port: 3306
 
 
 
+The setup above allows ingress traffic from all namespaces.
+
+If you require this ingress from a specific namespace, you introduce the namespace selector under the spec
+
+apiVersion: networking.k8s.io/vi
+kind: NetworkPolicy
+metadata
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role:db
+  policyTypes:
+  - ingress: 
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: api-pod
+      namespaceSelector            #   introduced the namespace selector. 
+        matchLabels: 
+          name:prod
+    ports:
+    - protocol: tcp
+      port: 3306
+
+what if we have the namespace pod without the api pod specified, it means all api pod within the namespace will be able to reach the pod.
+
+
+ - podSelector:
+      namespaceSelector            #   the namespace selector alone allows api calls from all pod in the namespace. 
+        matchLabels: 
+          name:prod
+
+Another selector is introducing the IP selector to allow api calls to the database from a specific IP addresses.
+
+introduce the IP block selector
+
+apiVersion: networking.k8s.io/vi
+kind: NetworkPolicy
+metadata
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role:db
+  policyTypes:
+  - ingress: 
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels: api-pod
+      namespaceSelector            #   introduced the namespace selector. 
+        matchLabels: 
+          name:prod
+      IPBlock:
+      - cidr: 192.168.5.10/32   # allows traffic from any api pod within this IP address 
+    ports:
+    - protocol: tcp
+      port: 3306
+
+In a situation where we have a database making an egress traffic to a backup server, we define the rule as follows 
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+  namespace: prod  # Ensure it's in the correct namespace
+spec:
+  podSelector:
+    matchLabels:
+      role: db  # Ensure this matches the labels in your deployment
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              api-pod: "true"
+        - namespaceSelector:
+            matchLabels:
+              name: prod
+      ports:
+        - protocol: TCP
+          port: 3306
+  egress:
+    - to:
+        - ipBlock:  # Corrected from IPBlock
+            cidr: 192.68.5.10/32
+      ports:
+        - protocol: TCP
+          port: 80
+
+ 
 
 
 
